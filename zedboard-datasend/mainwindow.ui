@@ -7,11 +7,11 @@
     <x>0</x>
     <y>0</y>
     <width>465</width>
-    <height>245</height>
+    <height>247</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>ZedBoard Cheetah</string>
   </property>
   <widget class="QWidget" name="centralWidget">
    <widget class="QLabel" name="label">
@@ -37,7 +37,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>File to send:</string>
+     <string>Filename:</string>
     </property>
    </widget>
    <widget class="QLineEdit" name="txtIPAddr">
@@ -45,12 +45,12 @@
      <rect>
       <x>170</x>
       <y>20</y>
-      <width>113</width>
+      <width>231</width>
       <height>27</height>
      </rect>
     </property>
     <property name="text">
-     <string>10.0.0.15</string>
+     <string>129.241.110.214</string>
     </property>
    </widget>
    <widget class="QLineEdit" name="txtFile">
@@ -61,6 +61,9 @@
       <width>241</width>
       <height>27</height>
      </rect>
+    </property>
+    <property name="text">
+     <string>/home/maltanar/Desktop/file.bin</string>
     </property>
    </widget>
    <widget class="QPushButton" name="btnSelFile">
@@ -80,7 +83,7 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>140</y>
+      <y>160</y>
       <width>71</width>
       <height>17</height>
      </rect>
@@ -99,7 +102,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>Write address (hex):</string>
+     <string>Target address (hex):</string>
     </property>
    </widget>
    <widget class="QLineEdit" name="txtStartAddr">
@@ -112,14 +115,14 @@
      </rect>
     </property>
     <property name="text">
-     <string>0x10000000</string>
+     <string>10000000</string>
     </property>
    </widget>
    <widget class="QProgressBar" name="prgSendProgress">
     <property name="geometry">
      <rect>
       <x>170</x>
-      <y>140</y>
+      <y>160</y>
       <width>241</width>
       <height>23</height>
      </rect>
@@ -139,6 +142,45 @@
     </property>
     <property name="text">
      <string>Send!</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btnReceive">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>200</y>
+      <width>99</width>
+      <height>27</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Receive!</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_5">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>130</y>
+      <width>141</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Size (hex):</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="txtSize">
+    <property name="geometry">
+     <rect>
+      <x>170</x>
+      <y>120</y>
+      <width>241</width>
+      <height>27</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
     </property>
    </widget>
   </widget>

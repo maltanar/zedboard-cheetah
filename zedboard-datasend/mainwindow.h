@@ -20,8 +20,13 @@ private slots:
 
     void on_btnSend_clicked();
 
+    void on_btnReceive_clicked();
+
 private:
     Ui::MainWindow *ui;
+
+    QByteArray makeReadCommand(unsigned int addr, unsigned int size);
+    QByteArray makeWriteCommand(unsigned int addr, unsigned int size);
 };
 
 #endif // MAINWINDOW_H

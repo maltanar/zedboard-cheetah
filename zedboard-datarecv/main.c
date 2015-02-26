@@ -66,7 +66,7 @@ int main()
 
 	/* the mac address of the board. this should be unique per board */
 	unsigned char mac_ethernet_address[] =
-	{ 0x00, 0x0a, 0x35, 0x00, 0x01, 0x02 };
+	{ 0x00, 0x0a, 0x35, 0x00, 0x02, 0x02 };
 
 	echo_netif = &server_netif;
 #if XPAR_GIGE_PCS_PMA_CORE_PRESENT == 1
@@ -77,9 +77,11 @@ int main()
 	init_platform();
 
 	/* initliaze IP addresses to be used */
-	/*IP4_ADDR(&ipaddr,  10, 0,   0, 3);
-	IP4_ADDR(&netmask, 255, 255, 255,  0);
-	IP4_ADDR(&gw,      10, 0,   0,  1);*/
+	/* 129.241.110.214 */
+	/*IP4_ADDR(&ipaddr,  129, 241,  110, 214);
+	IP4_ADDR(&netmask, 255, 255, 254,  0);
+	IP4_ADDR(&gw,      129, 241,  110,  1);*/
+
 	ipaddr.addr=0;
 	netmask.addr=0;
 	gw.addr=0;

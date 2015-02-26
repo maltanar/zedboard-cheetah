@@ -29,35 +29,174 @@ int transfer_data() {
 	return 0;
 }
 
-void print_app_header()
-{
+void print_app_header() {
 	xil_printf("\n\r\n\r-----lwIP TCP echo server ------\n\r");
 	xil_printf("TCP packets sent to port 6001 will be echoed back\n\r");
 }
 
-err_t recv_callback(void *arg, struct tcp_pcb *tpcb,
-                               struct pbuf *p, err_t err)
-{
+typedef enum {
+	IDLE, READ, WRITE, ERROR
+} cheetahState;
+
+cheetahState currentState = IDLE;
+unsigned int * targetAddr = 0;
+unsigned int bytesLeft = 0;
+char responseBuffer[1024];
+int sendResponse = 0;
+
+void xmit(struct tcp_pcb * tpcb) {
+	if (currentState != READ) {
+		xil_printf("Cannot do sendData except in READ state!\n");
+		currentState = ERROR;
+		return;
+	}
+
+	while(bytesLeft > 0) {
+		unsigned int tcpMaxSend = tcp_sndbuf(tpcb) / 8;
+		unsigned int len = bytesLeft < tcpMaxSend ? bytesLeft : tcpMaxSend;
+		err_t err = tcp_write(tpcb, (void *) targetAddr, len, 1);
+		if (err != ERR_OK) {
+			xil_printf("Error in sendData!\n");
+			currentState = ERROR;
+			return;
+		}
+		bytesLeft = bytesLeft - len;
+		targetAddr += len / 4;
+		xil_printf("xmit %x %d \n", targetAddr, len);
+		tcp_output(tpcb);
+	}
+
+	currentState = IDLE;
+	xil_printf("READ operation finished\n");
+}
+
+err_t sendCallback(void * arg, struct tcp_pcb * tpcb, u16_t len) {
+	return;
+
+	bytesLeft = bytesLeft - len;
+	targetAddr += len / 4;
+
+	if (bytesLeft == 0) {
+		currentState = IDLE;
+		xil_printf("READ operation finished\n");
+	} else
+		xmit(tpcb);
+
+	return ERR_OK;
+}
+
+
+
+void parseAndExecute(struct pbuf *p) {
+	char * content = p->payload;
+
+	if (p->len > 100) {
+		xil_printf("Invalid command -- too long! (%d bytes)\n", p->len);
+		return;
+	}
+
+	// otherwise, parse this command
+	content[p->len] = 0;	// zero terminate, just in case
+
+	char cmd = ' ';
+	unsigned int cmdAddr = 0, cmdSize = 0;
+
+	sscanf(content, "%c %x %x\n", &cmd, &cmdAddr, &cmdSize);
+
+	switch (cmd) {
+	case 'r':
+		// read from ZedBoard memory
+		if (cmdSize % 4 != 0)
+			currentState = ERROR;
+		else {
+			currentState = READ;
+			targetAddr = (unsigned int *) cmdAddr;
+			bytesLeft = cmdSize;
+			sprintf(responseBuffer,
+					"Starting READ operation: %d bytes from 0x%x\n", bytesLeft,
+					cmdAddr);
+			sendResponse = 1;
+		}
+		break;
+	case 'w':
+		// write to ZedBoard memory
+		if (cmdSize % 4 != 0)
+			currentState = ERROR;
+		else {
+			currentState = WRITE;
+			targetAddr = (unsigned int *) cmdAddr;
+			bytesLeft = cmdSize;
+			sprintf(responseBuffer,
+					"Starting WRITE operation: %d bytes to 0x%x\n", bytesLeft,
+					cmdAddr);
+			sendResponse = 1;
+		}
+
+		break;
+	default:
+		sprintf(responseBuffer, "Unrecognized command, ignoring...\n");
+	}
+}
+
+void handleWriteOp(struct pbuf *p) {
+	if (p->len % 4 != 0 || p->len == 0) {
+		xil_printf("Cannot handle write operation of size %d \n", p->len);
+		currentState = ERROR;
+		return;
+	}
+	bytesLeft = bytesLeft - p->len;
+
+	// word-wise copy
+	unsigned int * buf = (unsigned int *) p->payload;
+	int i;
+	for (i = 0; i < p->len / 4; p++) {
+		*targetAddr = buf[i];
+		targetAddr++;
+	}
+
+	if (bytesLeft == 0) {
+		currentState = IDLE;
+		sprintf(responseBuffer, "WRITE operation finished\n");
+		sendResponse = 1;
+	}
+}
+
+void handleData(struct pbuf *p) {
+	switch (currentState) {
+	case IDLE:
+		parseAndExecute(p);
+		break;
+	case WRITE:
+		handleWriteOp(p);
+		break;
+	case ERROR:
+		xil_printf(
+				"Something is wrong! Cheetah is in the ERROR state. Do something!\n");
+		break;
+	}
+}
+
+err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
 	/* do not read the packet if we are not in ESTABLISHED state */
 	if (!p) {
 		tcp_close(tpcb);
 		tcp_recv(tpcb, NULL);
 		return ERR_OK;
 	}
-
 	/* indicate that the packet has been received */
-	static unsigned int totalRecv = 0;
-	tcp_recved(tpcb, p->len);
-	totalRecv += p->len;
 
-	/* echo back the payload */
-	/* in this case, we assume that the payload is < TCP_SND_BUF */
-	if (tcp_sndbuf(tpcb) > p->len) {
-		//err = tcp_write(tpcb, p->payload, p->len, 1);
-		//xil_printf("echoed packet of length %d first 4 bytes %x \n",p->len,*(unsigned int*)p->payload);
-		xil_printf("%d %d\n", p->len, totalRecv);
-	} else
-		xil_printf("no space in tcp_sndbuf\n\r");
+	handleData(p);
+
+	if (sendResponse) {
+		xil_printf(responseBuffer);
+		sendResponse = 0;
+		//tcp_write(tpcb, (void *) responseBuffer, strlen(responseBuffer), 1);
+	}
+
+	if (currentState == READ)
+		xmit(tpcb);
+
+	tcp_recved(tpcb, p->len);
 
 	/* free the received pbuf */
 	pbuf_free(p);
@@ -65,16 +204,15 @@ err_t recv_callback(void *arg, struct tcp_pcb *tpcb,
 	return ERR_OK;
 }
 
-err_t accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
-{
+err_t accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err) {
 	static int connection = 1;
 
 	/* set the receive callback for this connection */
 	tcp_recv(newpcb, recv_callback);
 
 	/* just use an integer number indicating the connection id as the
-	   callback argument */
-	tcp_arg(newpcb, (void*)connection);
+	 callback argument */
+	tcp_arg(newpcb, (void*) connection);
 
 	/* increment for subsequent accepted connections */
 	connection++;
@@ -82,9 +220,7 @@ err_t accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 	return ERR_OK;
 }
 
-
-int start_application()
-{
+int start_application() {
 	struct tcp_pcb *pcb;
 	err_t err;
 	unsigned port = 80;
@@ -113,8 +249,9 @@ int start_application()
 		return -3;
 	}
 
-	/* specify callback to use for incoming connections */
-	tcp_accept(pcb, accept_callback);
+	/* specify callbacks to use  */
+	tcp_accept(pcb, &accept_callback);
+	tcp_sent(pcb, &sendCallback);
 
 	xil_printf("TCP echo server started @ port %d\n\r", port);
 

@@ -17,7 +17,7 @@
  */
 
 #include <stdio.h>
-
+#include "xil_cache.h"
 #include "xparameters.h"
 
 #include "netif/xadapter.h"
@@ -27,6 +27,8 @@
 #ifdef __arm__
 #include "xil_printf.h"
 #endif
+
+unsigned int finished = 0;
 
 /* defined by each RAW mode application */
 void print_app_header();
@@ -62,11 +64,13 @@ int ProgramSfpPhy(void);
 #endif
 int main()
 {
+	// disable caches -- still fast enough for copies, no worries about coherency
+	Xil_DCacheDisable();
 	struct ip_addr ipaddr, netmask, gw;
 
 	/* the mac address of the board. this should be unique per board */
 	unsigned char mac_ethernet_address[] =
-	{ 0x00, 0x0a, 0x35, 0x00, 0x02, 0x02 };
+	{ 0x00, 0x0a, 0x35, 0x00, 0x05, 0x12 };
 
 	echo_netif = &server_netif;
 #if XPAR_GIGE_PCS_PMA_CORE_PRESENT == 1
@@ -78,13 +82,14 @@ int main()
 
 	/* initliaze IP addresses to be used */
 	/* 129.241.110.214 */
-	/*IP4_ADDR(&ipaddr,  129, 241,  110, 214);
-	IP4_ADDR(&netmask, 255, 255, 254,  0);
-	IP4_ADDR(&gw,      129, 241,  110,  1);*/
-
 	ipaddr.addr=0;
 	netmask.addr=0;
 	gw.addr=0;
+	/*IP4_ADDR(&ipaddr,  129, 241,  110, 240);
+	IP4_ADDR(&netmask, 255, 255, 254,  0);
+	IP4_ADDR(&gw,      129, 241,  110,  1);*/
+
+
 
 	print_app_header();
 	print_ip_settings(&ipaddr, &netmask, &gw);
@@ -118,7 +123,8 @@ int main()
 
 	/* receive and process packets */
 	int msg = 0;
-	while (1) {
+
+	while (!finished) {
 		xemacif_input(echo_netif);
 		transfer_data();
 		if(!msg && echo_netif->ip_addr.addr)
@@ -130,7 +136,7 @@ int main()
 
 	}
   
-	/* never reached */
+	xil_printf("Cheetah finished, exiting..\n");
 	cleanup_platform();
 
 	return 0;

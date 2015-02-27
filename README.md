@@ -5,16 +5,13 @@ Utilities for transferring (large) files into the ZedBoard over ethernet from a 
 
 Contains two sub-projects:
 
-zedboard-datasend, a Qt application for sending data from the host side.
+zedboard-datasend, a Qt application for sending data from the host side. Supports a tiny subset of xmd commands for executing tcl scripts, useful for batch processing.
 zedboard-datarecv, example bare-bones application for receiving the data on the ZedBoard target and writing it into the DDR.
 
-Status: not yet usable, target only prints received packet sizes (to verify that we actually received everything).
-
+Status: copying data into ZedBoard works
 
 TODO:
- - decide on format for memory write command format
- - implement some handshaking
- - implement write commands on host side
- - implement write commands on target side
- - add read (from host) support
-
+ - add support for reading from ZedBoard
+ - add support for generating md5 hashes of data for quick verification
+ - code cleanup and structuring
+ - make zedboard side modular for easy integration into projects

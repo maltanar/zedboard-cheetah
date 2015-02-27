@@ -25,6 +25,8 @@
 #include "xil_printf.h"
 #endif
 
+extern unsigned int finished;
+
 int transfer_data() {
 	return 0;
 }
@@ -70,8 +72,7 @@ void xmit(struct tcp_pcb * tpcb) {
 	xil_printf("READ operation finished\n");
 }
 
-err_t sendCallback(void * arg, struct tcp_pcb * tpcb, u16_t len) {
-	return;
+err_t sendCallback(void * arg, struct tcp_pcb * tpcb, u16_t len){
 
 	bytesLeft = bytesLeft - len;
 	targetAddr += len / 4;
@@ -84,7 +85,6 @@ err_t sendCallback(void * arg, struct tcp_pcb * tpcb, u16_t len) {
 
 	return ERR_OK;
 }
-
 
 
 void parseAndExecute(struct pbuf *p) {
@@ -104,6 +104,9 @@ void parseAndExecute(struct pbuf *p) {
 	sscanf(content, "%c %x %x\n", &cmd, &cmdAddr, &cmdSize);
 
 	switch (cmd) {
+	case 'x':
+		// exit
+		finished = 1;
 	case 'r':
 		// read from ZedBoard memory
 		if (cmdSize % 4 != 0)
@@ -149,8 +152,8 @@ void handleWriteOp(struct pbuf *p) {
 	// word-wise copy
 	unsigned int * buf = (unsigned int *) p->payload;
 	int i;
-	for (i = 0; i < p->len / 4; p++) {
-		*targetAddr = buf[i];
+	for (i = 0; i < (p->len / 4); i++) {
+		targetAddr[0] = buf[i];
 		targetAddr++;
 	}
 
@@ -251,7 +254,7 @@ int start_application() {
 
 	/* specify callbacks to use  */
 	tcp_accept(pcb, &accept_callback);
-	tcp_sent(pcb, &sendCallback);
+	//tcp_sent(pcb, &sendCallback);
 
 	xil_printf("TCP echo server started @ port %d\n\r", port);
 

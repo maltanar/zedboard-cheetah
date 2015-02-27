@@ -134,7 +134,7 @@
    <widget class="QPushButton" name="btnSend">
     <property name="geometry">
      <rect>
-      <x>320</x>
+      <x>180</x>
       <y>200</y>
       <width>99</width>
       <height>27</height>
@@ -181,6 +181,19 @@
     </property>
     <property name="text">
      <string/>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btnExecXMD">
+    <property name="geometry">
+     <rect>
+      <x>310</x>
+      <y>200</y>
+      <width>141</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Execute xmd script..</string>
     </property>
    </widget>
   </widget>

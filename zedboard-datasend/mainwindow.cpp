@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDataStream>
+#include <QTextStream>
 #include <QDebug>
 #include <QDateTime>
 #include <QtNetwork/QTcpSocket>
@@ -39,9 +40,8 @@ void MainWindow::on_btnSend_clicked()
 {
     QString fileName = ui->txtFile->text();
     unsigned int startAddr = ui->txtStartAddr->text().toUInt(0, 16);
-    unsigned int dataSize = ui->txtSize->text().toUInt(0, 16);
 
-    writeFromFile(startAddr, dataSize, fileName);
+    writeFromFile(startAddr, fileName);
 }
 
 QByteArray MainWindow::makeReadCommand(unsigned int addr, unsigned int size)
@@ -65,7 +65,7 @@ void MainWindow::on_btnReceive_clicked()
     readToFile(startAddr, dataSize, ui->txtFile->text());
 }
 
-bool MainWindow::writeFromFile(unsigned int startAddr, unsigned int dataSize, QString fileName)
+bool MainWindow::writeFromFile(unsigned int startAddr, QString fileName)
 {
     QFile f(fileName);
     f.open(QIODevice::ReadOnly);
@@ -84,18 +84,20 @@ bool MainWindow::writeFromFile(unsigned int startAddr, unsigned int dataSize, QS
         qDebug() << "connection OK";
     }
 
-    // build command and send
-    socket.write(makeWriteCommand(startAddr, dataSize));
-    socket.waitForBytesWritten(100);
-
-    const int packetSize = 256;
-    int pos = 0, numChunks = fileData.size() / packetSize;
-
     if(fileData.size() % 4 != 0) {
       qDebug() << "error: file size must be divisable by 4";
       socket.disconnectFromHost();
       return false;
     }
+
+    // build command and send
+    socket.write(makeWriteCommand(startAddr, fileData.size()));
+    socket.waitForBytesWritten(100);
+
+    const int packetSize = 256;
+    int pos = 0, numChunks = fileData.size() / packetSize;
+
+
 
     qDebug() << "sending " << numChunks << " chunks of " << packetSize << " bytes";
 
@@ -169,4 +171,34 @@ bool MainWindow::readToFile(unsigned int startAddr, unsigned int dataSize, QStri
 
     socket.disconnectFromHost();
     return true;
+}
+
+void MainWindow::performXMDWriteCmd(QString cmd)
+{
+    QStringList params = cmd.split(" ");
+    if(params[0] != "dow" || params[1] != "-data")
+        return;
+
+    QString fileName = params[2];
+    unsigned int addr = params[3].toInt(0, 16);
+
+    writeFromFile(addr, fileName);
+}
+
+void MainWindow::on_btnExecXMD_clicked()
+{
+    QString fileName = QFileDialog::getOpenFileName(0, "Select XMD Tcl script", "", "*.tcl");
+    QFile inputFile(fileName);
+    if (inputFile.open(QIODevice::ReadOnly))
+    {
+       QTextStream in(&inputFile);
+       while (!in.atEnd())
+       {
+          QString line = in.readLine();
+          qDebug() << line;
+          if(line.startsWith("dow"))
+              performXMDWriteCmd(line);
+       }
+       inputFile.close();
+    }
 }

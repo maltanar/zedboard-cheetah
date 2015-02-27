@@ -94,24 +94,23 @@ bool MainWindow::writeFromFile(unsigned int startAddr, QString fileName)
     socket.write(makeWriteCommand(startAddr, fileData.size()));
     socket.waitForBytesWritten(100);
 
-    const int packetSize = 256;
-    int pos = 0, numChunks = fileData.size() / packetSize;
-
-
-
-    qDebug() << "sending " << numChunks << " chunks of " << packetSize << " bytes";
+    const int packetSize = 1024;
+    unsigned int bytesLeft = fileData.size(), pos = 0;
 
 
     ui->prgSendProgress->setMaximum(fileData.size());
 
     quint64 start = QDateTime::currentMSecsSinceEpoch();
-    while(pos < fileData.size())
+    while(bytesLeft)
     {
-        QByteArray chunk = fileData.mid(pos, packetSize);
+        unsigned int currentSize = bytesLeft < packetSize ? bytesLeft : packetSize;
+        QByteArray chunk = fileData.mid(pos, currentSize);
+
         socket.write(chunk);
         socket.waitForBytesWritten(100);
 
-        pos += chunk.size();
+        pos += currentSize;
+        bytesLeft -= currentSize;
 
         //qDebug() << "now at pos " << pos;
 
@@ -120,7 +119,8 @@ bool MainWindow::writeFromFile(unsigned int startAddr, QString fileName)
     quint64 end = QDateTime::currentMSecsSinceEpoch();
 
     qDebug() << "send completed in " << end - start << " msecs";
-    qDebug() << "Bandwidth: " << (fileData.size()/1024) / ((end-start)/1000) << " KB/s" << endl;
+    if(end != start)
+      qDebug() << "Bandwidth: " << ((float)(fileData.size()/1024) / ((float)(end-start))) * 1000 << " KB/s" << endl;
 
     socket.waitForReadyRead(100);
 
@@ -173,6 +173,7 @@ bool MainWindow::readToFile(unsigned int startAddr, unsigned int dataSize, QStri
     return true;
 }
 
+
 void MainWindow::performXMDWriteCmd(QString cmd)
 {
     QStringList params = cmd.split(" ");
@@ -187,6 +188,7 @@ void MainWindow::performXMDWriteCmd(QString cmd)
 
 void MainWindow::on_btnExecXMD_clicked()
 {
+    quint64 start = QDateTime::currentMSecsSinceEpoch();
     QString fileName = QFileDialog::getOpenFileName(0, "Select XMD Tcl script", "", "*.tcl");
     QFile inputFile(fileName);
     if (inputFile.open(QIODevice::ReadOnly))
@@ -201,4 +203,31 @@ void MainWindow::on_btnExecXMD_clicked()
        }
        inputFile.close();
     }
+
+    quint64 end = QDateTime::currentMSecsSinceEpoch();
+    qDebug() << "xmd execution took " << (float)(end-start)/1000 <<" seconds";
 }
+
+void MainWindow::on_btnFinish_clicked()
+{
+  QString cmd = "x 0 0\n";
+
+  QTcpSocket socket;
+  socket.connectToHost(ui->txtIPAddr->text(), 80);
+
+  if(!socket.waitForConnected(2000))
+  {
+      qDebug() << "could not connect to socket";
+      return ;
+  } else
+  {
+      qDebug() << "connection OK";
+  }
+
+  // build command and send
+  socket.write(cmd.toLocal8Bit());
+  socket.waitForBytesWritten(100);
+  socket.disconnectFromHost();
+
+}
+

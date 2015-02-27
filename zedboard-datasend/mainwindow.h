@@ -30,6 +30,8 @@ private slots:
 
     void on_btnExecXMD_clicked();
 
+    void on_btnFinish_clicked();
+
 private:
     Ui::MainWindow *ui;
 

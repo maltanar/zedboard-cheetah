@@ -111,6 +111,8 @@ bool MainWindow::writeFromFile(unsigned int startAddr, QString fileName)
 
         pos += currentSize;
         bytesLeft -= currentSize;
+        // prevent user interface from freezing underway
+        QApplication::processEvents();
 
         //qDebug() << "now at pos " << pos;
 

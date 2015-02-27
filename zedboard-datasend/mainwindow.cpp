@@ -33,84 +33,15 @@ void MainWindow::on_btnSelFile_clicked()
     } else {
       ui->txtSize->setText(QString::number(f.size(), 16));
     }
-
 }
 
 void MainWindow::on_btnSend_clicked()
 {
-    QFile f(ui->txtFile->text());
-    f.open(QIODevice::ReadOnly);
-    QByteArray fileData = f.readAll();
-    f.close();
-
-    QTcpSocket socket;
-    socket.connectToHost(ui->txtIPAddr->text(), 80);
-
-    if(!socket.waitForConnected(2000))
-    {
-        qDebug() << "could not connect to socket";
-        return;
-    } else
-    {
-        qDebug() << "connection OK";
-    }
-
-
-    // build command and send
+    QString fileName = ui->txtFile->text();
     unsigned int startAddr = ui->txtStartAddr->text().toUInt(0, 16);
     unsigned int dataSize = ui->txtSize->text().toUInt(0, 16);
-    socket.write(makeWriteCommand(startAddr, dataSize));
-    socket.waitForBytesWritten(100);
 
-    socket.waitForReadyRead(100);
-    qDebug() << "write cmd reply: " << socket.readAll();
-
-    const int packetSize = 256;
-    int pos = 0, numChunks = fileData.size() / packetSize;
-
-    if(fileData.size() % 4 != 0) {
-      qDebug() << "error: file size must be divisable by 4";
-      socket.disconnectFromHost();
-      return;
-    }
-
-    qDebug() << "sending " << numChunks << " chunks of " << packetSize << " bytes";
-
-
-    ui->prgSendProgress->setMaximum(fileData.size());
-
-    int readSize = 0;
-
-    quint64 start = QDateTime::currentMSecsSinceEpoch();
-    while(pos < fileData.size())
-    {
-        QByteArray chunk = fileData.mid(pos, packetSize);
-        socket.write(chunk);
-        socket.waitForBytesWritten(100);
-
-        /*readSize = 0;
-        while(readSize < chunk.size())
-        {
-            readSize += socket.readAll().size();
-            socket.waitForReadyRead(100);
-            qApp->processEvents();
-            qDebug() << "readSize" << readSize;
-        }*/
-        pos += chunk.size();
-
-        //qDebug() << "now at pos " << pos;
-
-        ui->prgSendProgress->setValue(pos);
-    }
-    quint64 end = QDateTime::currentMSecsSinceEpoch();
-
-    qDebug() << "send completed in " << end - start << " msecs";
-    qDebug() << "Bandwidth: " << (fileData.size()/1024) / ((end-start)/1000) << " KB/s" << endl;
-
-    socket.waitForReadyRead(100);
-    qDebug() << "write cmd final reply: " << socket.readAll();
-
-    socket.disconnectFromHost();
+    writeFromFile(startAddr, dataSize, fileName);
 }
 
 QByteArray MainWindow::makeReadCommand(unsigned int addr, unsigned int size)
@@ -129,40 +60,113 @@ QByteArray MainWindow::makeWriteCommand(unsigned int addr, unsigned int size)
 
 void MainWindow::on_btnReceive_clicked()
 {
-  QTcpSocket socket;
-  socket.connectToHost(ui->txtIPAddr->text(), 80);
+    unsigned int startAddr = ui->txtStartAddr->text().toUInt(0, 16);
+    unsigned int dataSize = ui->txtSize->text().toUInt(0, 16);
+    readToFile(startAddr, dataSize, ui->txtFile->text());
+}
 
-  if(!socket.waitForConnected(2000))
-  {
-      qDebug() << "could not connect to socket";
-      return;
-  } else
-  {
-      qDebug() << "connection OK";
-  }
+bool MainWindow::writeFromFile(unsigned int startAddr, unsigned int dataSize, QString fileName)
+{
+    QFile f(fileName);
+    f.open(QIODevice::ReadOnly);
+    QByteArray fileData = f.readAll();
+    f.close();
+
+    QTcpSocket socket;
+    socket.connectToHost(ui->txtIPAddr->text(), 80);
+
+    if(!socket.waitForConnected(2000))
+    {
+        qDebug() << "could not connect to socket";
+        return false;
+    } else
+    {
+        qDebug() << "connection OK";
+    }
+
+    // build command and send
+    socket.write(makeWriteCommand(startAddr, dataSize));
+    socket.waitForBytesWritten(100);
+
+    const int packetSize = 256;
+    int pos = 0, numChunks = fileData.size() / packetSize;
+
+    if(fileData.size() % 4 != 0) {
+      qDebug() << "error: file size must be divisable by 4";
+      socket.disconnectFromHost();
+      return false;
+    }
+
+    qDebug() << "sending " << numChunks << " chunks of " << packetSize << " bytes";
 
 
-  // build command and send
-  unsigned int startAddr = ui->txtStartAddr->text().toUInt(0, 16);
-  unsigned int dataSize = ui->txtSize->text().toUInt(0, 16);
-  socket.write(makeReadCommand(startAddr, dataSize));
-  socket.waitForBytesWritten(100);
+    ui->prgSendProgress->setMaximum(fileData.size());
 
-  ui->prgSendProgress->setMaximum(dataSize);
+    quint64 start = QDateTime::currentMSecsSinceEpoch();
+    while(pos < fileData.size())
+    {
+        QByteArray chunk = fileData.mid(pos, packetSize);
+        socket.write(chunk);
+        socket.waitForBytesWritten(100);
 
-  QByteArray recvData;
+        pos += chunk.size();
 
-  while(recvData.size() != dataSize) {
+        //qDebug() << "now at pos " << pos;
+
+        ui->prgSendProgress->setValue(pos);
+    }
+    quint64 end = QDateTime::currentMSecsSinceEpoch();
+
+    qDebug() << "send completed in " << end - start << " msecs";
+    qDebug() << "Bandwidth: " << (fileData.size()/1024) / ((end-start)/1000) << " KB/s" << endl;
+
     socket.waitForReadyRead(100);
 
-    recvData.append(socket.readAll());
-    ui->prgSendProgress->setValue(recvData.size());
-    qDebug() << "received data: " << recvData.size();
-  }
+    socket.disconnectFromHost();
 
-  socket.waitForReadyRead(1);
-  qDebug() << "read cmd final reply: " << socket.readAll();
-  qDebug() << "total received data size: " << recvData.size();
+    return true;
+}
 
-  socket.disconnectFromHost();
+bool MainWindow::readToFile(unsigned int startAddr, unsigned int dataSize, QString fileName)
+{
+    qDebug() << "Does not work yet!";
+
+    return false;
+
+    QTcpSocket socket;
+    socket.connectToHost(ui->txtIPAddr->text(), 80);
+
+    if(!socket.waitForConnected(2000))
+    {
+        qDebug() << "could not connect to socket";
+        return false;
+    } else
+    {
+        qDebug() << "connection OK";
+    }
+
+
+    // build command and send
+
+    socket.write(makeReadCommand(startAddr, dataSize));
+    socket.waitForBytesWritten(100);
+
+    ui->prgSendProgress->setMaximum(dataSize);
+
+    QByteArray recvData;
+
+    while(recvData.size() != dataSize) {
+      socket.waitForReadyRead(100);
+
+      recvData.append(socket.readAll());
+      ui->prgSendProgress->setValue(recvData.size());
+      qDebug() << "received data: " << recvData.size();
+    }
+
+    socket.waitForReadyRead(1);
+    qDebug() << "read cmd final reply: " << socket.readAll();
+    qDebug() << "total received data size: " << recvData.size();
+
+    socket.disconnectFromHost();
+    return true;
 }

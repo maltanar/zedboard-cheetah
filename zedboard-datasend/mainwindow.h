@@ -15,6 +15,10 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
+protected:
+    bool writeFromFile(unsigned int startAddr, unsigned int dataSize, QString fileName);
+    bool readToFile(unsigned int startAddr, unsigned int dataSize, QString fileName);
+
 private slots:
     void on_btnSelFile_clicked();
 
